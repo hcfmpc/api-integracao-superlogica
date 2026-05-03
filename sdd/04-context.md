@@ -4,9 +4,9 @@
 
 ## Estado Atual
 
-**Fase 1 concluída em 2026-05-03.** Pronto para iniciar a Fase 2.
+**Fase 2 concluída em 2026-05-03.** Pronto para iniciar a Fase 3 (pré-requisito: confirmar endpoint Superlógica).
 
-### O que foi implementado (Fase 1)
+### O que foi implementado (Fases 1 e 2)
 
 | Arquivo | Responsabilidade |
 |---|---|
@@ -17,15 +17,22 @@
 | `src/.../Services/AuthService.cs` | OAuth2 client_credentials + mTLS X509; cache in-memory com TTL - 30s |
 | `src/.../Services/RetornoSicoobService.cs` | POST solicitar → polling → GET download em MemoryStream |
 | `src/.../Services/DatabaseInitializer.cs` | Aplica `db/schema.sql` na inicialização |
-| `src/.../Workers/IntegracaoWorker.cs` | `BackgroundService` com `PeriodicTimer` + `SemaphoreSlim(1,1)` (skeleton Fase 1) |
+| `src/.../Services/CnabParserService.cs` | Parser posicional CNAB 240 segmentos T+U; FluentValidation; Latin-1 |
+| `src/.../Services/IdempotencyService.cs` | SHA-256(condId+dataInicial+dataFinal+fileHash); INSERT OR IGNORE |
+| `src/.../Services/StatusService.cs` | Criar/atualizar `execucoes` no SQLite (Dapper) |
+| `src/.../Models/CnabRegistro.cs` | `record` com dados financeiros em memória (nunca persistidos) |
+| `src/.../Workers/IntegracaoWorker.cs` | Pipeline completo: status → idempotência → parse → FINALIZADO |
 | `src/.../Program.cs` | DI completo, Serilog, leitura senha mestre com máscara |
 | `db/schema.sql` | DDL com `IF NOT EXISTS`, WAL mode, FK, índices |
 | `tests/.../Unit/CryptoServiceTests.cs` | 5 testes unitários |
 | `tests/.../Unit/CondominioServiceTests.cs` | 3 testes unitários com SQLite in-memory |
 | `tests/.../Integration/AuthServiceIntegrationTests.cs` | 4 testes com WireMock.Net |
 | `tests/.../Integration/RetornoSicoobServiceTests.cs` | 3 testes com WireMock.Net |
+| `tests/.../Unit/CnabParserServiceTests.cs` | 8 testes unitários com fixtures CNAB 240 |
+| `tests/.../Unit/IdempotencyServiceTests.cs` | 6 testes unitários com SQLite in-memory |
+| `tests/.../Integration/IntegracaoWorkerTests.cs` | 3 testes: falha parcial, sem movimento, idempotência |
 
-**Resultados:** `dotnet build` Release ✅ | `dotnet test` 15/15 ✅
+**Resultados:** `dotnet build` Release ✅ | `dotnet test` 33/33 ✅
 
 ### Decisões técnicas tomadas na Fase 1
 
@@ -90,7 +97,7 @@
 |---|---|
 | SDD backend concluído | ✅ |
 | Setup .NET 10 + autenticação Sicoob em homologação | ✅ Fase 1 (2026-05-03) |
-| Parser CNAB 240 + múltiplos condomínios + idempotência | ⬜ Fase 2 |
+| Parser CNAB 240 + múltiplos condomínios + idempotência | ✅ Fase 2 (2026-05-03) |
 | Confirmação endpoint Superlógica | ⬜ Pré-Fase 3 |
 | Integração Superlógica em homologação | ⬜ Fase 3 |
 | PeriodicTimer + reprocessamento + notificação | ⬜ Fase 4 |

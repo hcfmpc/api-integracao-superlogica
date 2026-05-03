@@ -41,25 +41,27 @@
 
 ---
 
-## Fase 2 – Parser CNAB, Múltiplos Condomínios e Idempotência
+## Fase 2 – Parser CNAB, Múltiplos Condomínios e Idempotência ✅ CONCLUÍDA (2026-05-03)
 
 ### 2.1 Parser CNAB 240
-- [ ] Implementar `CnabParserService`: segmentos T e U (layout posicional fixo)
-- [ ] Modelar `CnabRegistro` como `record` tipado
-- [ ] Validar campos obrigatórios via FluentValidation
-- [ ] Testes com fixtures CNAB (liquidação normal, sem movimento, campo inválido, truncado)
+- [x] Implementar `CnabParserService`: segmentos T e U (layout posicional fixo)
+- [x] Modelar `CnabRegistro` como `record` tipado
+- [x] Validar campos obrigatórios via FluentValidation
+- [x] Testes com fixtures CNAB (liquidação normal, sem movimento, campo inválido, truncado)
 
 ### 2.2 Múltiplos condomínios
-- [ ] Implementar `IntegracaoWorker` como `BackgroundService` com `PeriodicTimer`
-- [ ] Fila sequencial com `Task.Delay(60 s)` entre condomínios
-- [ ] `try/catch` por condomínio: falha em um não interrompe os demais
-- [ ] `SemaphoreSlim(1,1)`: ciclos não se sobrepõem
-- [ ] Teste de integração: falha parcial (1 de 3 condomínios falha)
+- [x] Implementar `IntegracaoWorker` como `BackgroundService` com `PeriodicTimer`
+- [x] Fila sequencial com `Task.Delay(60 s)` entre condomínios
+- [x] `try/catch` por condomínio: falha em um não interrompe os demais
+- [x] `SemaphoreSlim(1,1)`: ciclos não se sobrepõem
+- [x] Teste de integração: falha parcial (1 de 3 condomínios falha)
 
 ### 2.3 Idempotência
-- [ ] Implementar `IdempotencyService`: SHA-256 de (condomínio_id + data_inicial + data_final + checksum)
-- [ ] Bloquear silenciosamente se hash já existir com status `SUCESSO`
-- [ ] Testes unitários
+- [x] Implementar `IdempotencyService`: SHA-256 de (condomínio_id + data_inicial + data_final + checksum)
+- [x] Bloquear silenciosamente se hash já existir com status `SUCESSO`
+- [x] Testes unitários
+
+**Build:** `dotnet build` ✅ | **Testes:** 33/33 ✅
 
 ---
 

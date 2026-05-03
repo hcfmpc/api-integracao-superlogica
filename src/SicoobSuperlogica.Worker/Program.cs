@@ -41,6 +41,9 @@ builder.Services.AddSingleton<ICryptoService>(_ => new CryptoService(masterPassw
 builder.Services.AddSingleton<IAuthService, AuthService>();
 builder.Services.AddScoped<ICondominioService, CondominioService>();
 builder.Services.AddScoped<IRetornoSicoobService, RetornoSicoobService>();
+builder.Services.AddSingleton<ICnabParserService, CnabParserService>();
+builder.Services.AddScoped<IIdempotencyService, IdempotencyService>();
+builder.Services.AddScoped<IStatusService, StatusService>();
 
 // HTTP clients
 var retryPolicy = HttpPolicyExtensions
