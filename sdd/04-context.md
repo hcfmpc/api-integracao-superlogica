@@ -89,7 +89,7 @@
 | Marco | Status |
 |---|---|
 | SDD backend concluído | ✅ |
-| Setup .NET 10 + autenticação Sicoob em homologação | ⬜ Fase 1 |
+| Setup .NET 10 + autenticação Sicoob em homologação | ✅ Fase 1 (2026-05-03) |
 | Parser CNAB 240 + múltiplos condomínios + idempotência | ⬜ Fase 2 |
 | Confirmação endpoint Superlógica | ⬜ Pré-Fase 3 |
 | Integração Superlógica em homologação | ⬜ Fase 3 |
