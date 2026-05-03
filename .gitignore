@@ -1,0 +1,70 @@
+## .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.rsuser
+.idea/
+
+## Publish output
+publish/
+out/
+
+## NuGet
+*.nupkg
+*.snupkg
+project.lock.json
+packages/
+
+## Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+
+## Coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+lcov.info
+
+## Test caches
+.hypothesis/
+
+## SQLite databases (runtime artefact)
+*.db
+*.db-shm
+*.db-wal
+
+## Certificates / secrets
+*.pfx
+*.p12
+*.key
+*.pem
+appsettings.Development.json
+appsettings.Production.json
+secrets.json
+
+## OS artefacts
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+## Editor artefacts
+*.swp
+*~
+.vscode/
+!.vscode/extensions.json
+
+## Rider
+.idea/
+*.sln.iml

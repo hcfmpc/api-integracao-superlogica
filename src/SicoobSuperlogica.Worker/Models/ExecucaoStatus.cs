@@ -1,0 +1,14 @@
+namespace SicoobSuperlogica.Worker.Models;
+
+public enum ExecucaoStatus
+{
+    A_PROCESSAR,
+    PROCESSAMENTO_FINALIZADO,
+    ARQUIVO_BAIXADO,
+    ENVIANDO_TITULOS,
+    SEM_TITULOS,
+    ENVIADO_SUPERLOGICA,
+    FINALIZADO,
+    FALHA_TEMPORARIA,
+    FALHA_PERMANENTE
+}
