@@ -24,7 +24,9 @@
       "Bash(NUGET_HTTP_CACHE_PATH=/tmp/nuget-cache dotnet build *)",
       "Bash(NUGET_HTTP_CACHE_PATH=/tmp/nuget-cache SICOOB_MASTER_PASSWORD=test dotnet test *)",
       "Bash(NUGET_HTTP_CACHE_PATH=/tmp/nuget-cache SICOOB_MASTER_PASSWORD=test dotnet build --nologo -c Release)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git -C /home/elias/projetos/api-prioriza/api-integracao-superlogica add sdd/04-context.md)",
+      "Bash(git -C /home/elias/projetos/api-prioriza/api-integracao-superlogica commit -m ' *)"
     ]
   }
 }
