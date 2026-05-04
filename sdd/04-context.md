@@ -4,7 +4,7 @@
 
 ## Estado Atual
 
-**Fase 4 concluída em 2026-05-03.** Reprocessamento de `FALHA_TEMPORARIA`, alerta crítico de certificado PFX, shutdown graceful com `IHostApplicationLifetime`, e log estruturado `alerta/tipo=CRITICO` implementados. Teste E2E Superlógica bloqueado até confirmação do endpoint.
+**Fase 5 concluída em 2026-05-04.** Minimal API REST com 3 endpoints (`/api/status`, `/api/condominios`, `/api/execucoes/{id}`), filtro de IP RFC-1918, `UseStaticFiles()`, CORS para `localhost:4200`, singletons para todos os serviços, e isolamento de ciclo via `ExecutarCicloInternoAsync`. Teste E2E Superlógica bloqueado até confirmação do endpoint.
 
 ### O que foi implementado (Fases 1–4)
 
@@ -33,8 +33,9 @@
 | `tests/.../Unit/IdempotencyServiceTests.cs` | 6 testes unitários com SQLite in-memory |
 | `tests/.../Integration/IntegracaoWorkerTests.cs` | 6 testes: falha parcial, sem movimento, idempotência, falha upload, sequência de status, reprocessamento FALHA_TEMPORARIA |
 | `tests/.../Integration/SuperlogicaServiceTests.cs` | 5 testes com WireMock.Net: sucesso, headers, 4xx, 5xx, stream reposicionado |
+| `tests/.../Integration/DashboardApiTests.cs` | 6 testes com `WebApplicationFactory<Program>`: status, condominios, id existente, id inexistente, dados corretos, filtro IP |
 
-**Resultados:** `dotnet build` Release ✅ | `dotnet test` 41/41 ✅
+**Resultados:** `dotnet build` ✅ | `dotnet test` 47/47 ✅
 
 ### Decisões técnicas tomadas na Fase 1
 
@@ -106,4 +107,4 @@
 | Confirmação endpoint Superlógica | ⬜ Pendente (path configurável; E2E bloqueado) |
 | Integração Superlógica em homologação | ✅ Fase 3 (2026-05-03) |
 | PeriodicTimer + reprocessamento + notificação | ✅ Fase 4 (2026-05-03) |
-| Minimal API + hardening + publicação Windows | ⬜ Fase 5 |
+| Minimal API + hardening + publicação Windows | ✅ Fase 5 (2026-05-04) |
