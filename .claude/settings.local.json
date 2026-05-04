@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet --version)",
+      "Bash(dotnet --list-sdks)",
+      "Read(//usr/local/share/dotnet/**)",
+      "Read(//home/elias/.dotnet/**)",
+      "Bash(curl -fsSL https://dot.net/v1/dotnet-install.sh)",
+      "Bash(bash -s -- --channel 10.0 --install-dir ~/.dotnet)",
+      "Bash(export PATH=\"$HOME/.dotnet:$PATH\")",
+      "Bash(dotnet new *)",
+      "Bash(dotnet sln *)",
+      "Bash(export NUGET_PACKAGES=\"$HOME/.nuget/packages\")",
+      "Bash(dotnet add *)",
+      "Bash(dotnet build *)",
+      "Bash(dotnet test *)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'docs: corrige marco Fase 1 para ✅ na tabela de marcos do 04-context *)",
+      "Bash(export PATH=\"$PATH:$HOME/.dotnet\")",
+      "Bash(git commit -m ' *)",
+      "Bash(~/.dotnet/dotnet build *)",
+      "Bash(/mnt/c/Program Files/dotnet/dotnet *)",
+      "Bash(NUGET_HTTP_CACHE_PATH=/tmp/nuget-cache dotnet add *)",
+      "Bash(NUGET_HTTP_CACHE_PATH=/tmp/nuget-cache dotnet build *)",
+      "Bash(NUGET_HTTP_CACHE_PATH=/tmp/nuget-cache SICOOB_MASTER_PASSWORD=test dotnet test *)",
+      "Bash(NUGET_HTTP_CACHE_PATH=/tmp/nuget-cache SICOOB_MASTER_PASSWORD=test dotnet build --nologo -c Release)",
+      "Bash(git commit *)"
+    ]
+  }
+}
