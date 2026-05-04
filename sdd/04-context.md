@@ -4,9 +4,9 @@
 
 ## Estado Atual
 
-**Fase 2 concluída em 2026-05-03.** Pronto para iniciar a Fase 3 (pré-requisito: confirmar endpoint Superlógica).
+**Fase 4 concluída em 2026-05-03.** Reprocessamento de `FALHA_TEMPORARIA`, alerta crítico de certificado PFX, shutdown graceful com `IHostApplicationLifetime`, e log estruturado `alerta/tipo=CRITICO` implementados. Teste E2E Superlógica bloqueado até confirmação do endpoint.
 
-### O que foi implementado (Fases 1 e 2)
+### O que foi implementado (Fases 1–4)
 
 | Arquivo | Responsabilidade |
 |---|---|
@@ -21,7 +21,8 @@
 | `src/.../Services/IdempotencyService.cs` | SHA-256(condId+dataInicial+dataFinal+fileHash); INSERT OR IGNORE |
 | `src/.../Services/StatusService.cs` | Criar/atualizar `execucoes` no SQLite (Dapper) |
 | `src/.../Models/CnabRegistro.cs` | `record` com dados financeiros em memória (nunca persistidos) |
-| `src/.../Workers/IntegracaoWorker.cs` | Pipeline completo: status → idempotência → parse → FINALIZADO |
+| `src/.../Services/SuperlogicaService.cs` | Upload multipart CNAB 240 à Superlógica; headers por condomínio; status >= 300 = erro |
+| `src/.../Workers/IntegracaoWorker.cs` | Pipeline completo: status → idempotência → parse → upload Superlógica → FINALIZADO |
 | `src/.../Program.cs` | DI completo, Serilog, leitura senha mestre com máscara |
 | `db/schema.sql` | DDL com `IF NOT EXISTS`, WAL mode, FK, índices |
 | `tests/.../Unit/CryptoServiceTests.cs` | 5 testes unitários |
@@ -30,9 +31,10 @@
 | `tests/.../Integration/RetornoSicoobServiceTests.cs` | 3 testes com WireMock.Net |
 | `tests/.../Unit/CnabParserServiceTests.cs` | 8 testes unitários com fixtures CNAB 240 |
 | `tests/.../Unit/IdempotencyServiceTests.cs` | 6 testes unitários com SQLite in-memory |
-| `tests/.../Integration/IntegracaoWorkerTests.cs` | 3 testes: falha parcial, sem movimento, idempotência |
+| `tests/.../Integration/IntegracaoWorkerTests.cs` | 6 testes: falha parcial, sem movimento, idempotência, falha upload, sequência de status, reprocessamento FALHA_TEMPORARIA |
+| `tests/.../Integration/SuperlogicaServiceTests.cs` | 5 testes com WireMock.Net: sucesso, headers, 4xx, 5xx, stream reposicionado |
 
-**Resultados:** `dotnet build` Release ✅ | `dotnet test` 33/33 ✅
+**Resultados:** `dotnet build` Release ✅ | `dotnet test` 41/41 ✅
 
 ### Decisões técnicas tomadas na Fase 1
 
@@ -64,11 +66,11 @@
 
 | Item | Responsável | Prazo |
 |---|---|---|
-| Endpoint programático de upload CNAB 240 (Superlógica) | Responsável técnico | Antes da Fase 3 |
-| `Content-Type` e campos do `multipart/form-data` do upload | Dev | Antes da Fase 3 |
-| Rate limits da API Sicoob em homologação | Dev | Durante a Fase 1 |
-| Escopo do `access_token` por licença/condomínio na Superlógica | Dev | Durante a Fase 3 |
-| Meio de notificação de falhas críticas (e-mail, painel, outro) | Gestor + Dev | Antes da Fase 4 |
+| Endpoint programático de upload CNAB 240 (Superlógica) | Responsável técnico | Antes da Fase 5 (E2E) |
+| `Content-Type` e campos do `multipart/form-data` do upload | Dev | Antes da Fase 5 (E2E) |
+| Rate limits da API Sicoob em homologação | Dev | Durante testes E2E |
+| Escopo do `access_token` por licença/condomínio na Superlógica | Dev | Durante testes E2E |
+| Canal de notificação externo (e-mail, painel) — Fase 4 usou Serilog estruturado | Gestor + Dev | Pós-Fase 5 (backlog) |
 
 ## Decisões Técnicas
 
@@ -81,6 +83,9 @@
 | AES-GCM + PBKDF2 para credenciais | Proteção em repouso; chave nunca gravada em texto plano |
 | Polly para retry | Política declarativa sem duplicar lógica nos services |
 | Idempotência por hash SHA-256 | Previne dupla baixa em reprocessamento ou falha parcial |
+| Reprocessamento via `MarcarReprocessandoAsync` (→ `A_PROCESSAR`) | Evita acúmulo infinito de `FALHA_TEMPORARIA` sem esquema adicional |
+| Log estruturado `alerta=true, tipo=CRITICO` via `BeginScope` | Permite filtro por campo no Serilog sem acoplar o worker a Serilog diretamente |
+| `IHostApplicationLifetime.StopApplication()` em exceção fatal | Garante shutdown limpo sem matar o processo abruptamente |
 
 ## Riscos
 
@@ -98,7 +103,7 @@
 | SDD backend concluído | ✅ |
 | Setup .NET 10 + autenticação Sicoob em homologação | ✅ Fase 1 (2026-05-03) |
 | Parser CNAB 240 + múltiplos condomínios + idempotência | ✅ Fase 2 (2026-05-03) |
-| Confirmação endpoint Superlógica | ⬜ Pré-Fase 3 |
-| Integração Superlógica em homologação | ⬜ Fase 3 |
-| PeriodicTimer + reprocessamento + notificação | ⬜ Fase 4 |
+| Confirmação endpoint Superlógica | ⬜ Pendente (path configurável; E2E bloqueado) |
+| Integração Superlógica em homologação | ✅ Fase 3 (2026-05-03) |
+| PeriodicTimer + reprocessamento + notificação | ✅ Fase 4 (2026-05-03) |
 | Minimal API + hardening + publicação Windows | ⬜ Fase 5 |

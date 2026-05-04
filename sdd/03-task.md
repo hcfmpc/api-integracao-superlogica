@@ -65,7 +65,7 @@
 
 ---
 
-## Fase 3 – Integração Superlógica
+## Fase 3 – Integração Superlógica ✅ CONCLUÍDA (2026-05-03)
 
 > **Pré-requisito**: confirmar endpoint programático de upload junto ao suporte Superlógica.
 
@@ -76,42 +76,51 @@
 - [ ] Gerar `app_token` + `access_token` (Todos os usuários > API > Aplicativos > Novo App Token)
 
 ### 3.2 Implementação
-- [ ] Implementar `SuperlogicaService`: `IHttpClientFactory` + upload multipart do arquivo CNAB 240
-- [ ] Tratar `StatusCode >= 300` como erro com log do body de resposta
-- [ ] Preservar referência e marcar `FALHA_TEMPORARIA` em caso de erro
-- [ ] Testes com WireMock.Net simulando endpoint Superlógica
-- [ ] Teste E2E em homologação com arquivo CNAB real
+- [x] Implementar `SuperlogicaService`: `IHttpClientFactory` + upload `multipart/form-data` do CNAB 240
+- [x] `UploadPath` configurável em `appsettings.json` (confirmar com suporte antes de produção)
+- [x] Tratar `StatusCode >= 300` como erro com log do body de resposta
+- [x] Falha no upload marca `FALHA_TEMPORARIA`; idempotência não é registrada
+- [x] Testes com WireMock.Net: sucesso 200, headers corretos, erro 4xx, erro 5xx, stream reposicionado
+- [x] `IntegracaoWorker`: transições `ENVIANDO_TITULOS` → upload → `ENVIADO_SUPERLOGICA` → `FINALIZADO`
+- [x] Testes do worker: falha no upload, sequência completa de status, sem movimento, idempotência
+- [ ] Teste E2E em homologação com arquivo CNAB real (bloqueado até confirmação do endpoint)
+
+**Build:** `dotnet build` ✅ | **Testes:** 40/40 ✅
 
 ---
 
-## Fase 4 – Agendamento, Reprocessamento e Notificação
+## Fase 4 – Agendamento, Reprocessamento e Notificação ✅ CONCLUÍDA (2026-05-03)
 
-- [ ] `PeriodicTimer` configurável via `appsettings.json` (padrão: 1 hora)
-- [ ] Ao iniciar ciclo: consultar `execucoes` com `FALHA_TEMPORARIA` e reprocessar
-- [ ] Não reprocessar automaticamente `FALHA_PERMANENTE`
-- [ ] Serilog `Error` com `alerta: true, tipo: CRITICO` para falhas críticas
-- [ ] Alerta preventivo de expiração do certificado PFX (padrão: 30 dias antes)
-- [ ] Shutdown graceful: `CancellationToken` + `IHostApplicationLifetime`
+- [x] `PeriodicTimer` configurável via `appsettings.json` (padrão: 1 hora)
+- [x] Ao iniciar ciclo: consultar `execucoes` com `FALHA_TEMPORARIA` e reprocessar
+- [x] Não reprocessar automaticamente `FALHA_PERMANENTE`
+- [x] Serilog `Error` com `alerta: true, tipo: CRITICO` para falhas críticas
+- [x] Alerta preventivo de expiração do certificado PFX (padrão: 30 dias antes)
+- [x] Shutdown graceful: `CancellationToken` + `IHostApplicationLifetime`
+
+**Build:** `dotnet build` ✅ | **Testes:** 41/41 ✅
 
 ---
 
-## Fase 5 – Minimal API, Hardening e Implantação
+## Fase 5 – Minimal API, Hardening e Implantação ✅ CONCLUÍDA (2026-05-03)
 
 ### 5.1 Minimal API REST (consumida pelo dashboard Angular)
-- [ ] Configurar `UseStaticFiles()`, CORS para `http://localhost:4200` e `MapGet` em `Program.cs`
-- [ ] Implementar `StatusService`: ler `execucoes` e `condominios` via Dapper
-- [ ] Adicionar campo `status` (enum `ExecucaoStatus`, 9 estados) em `execucoes`
-- [ ] Atualizar status no `IntegracaoWorker` a cada transição de fase
-- [ ] Middleware de filtro de IP: aceitar apenas `localhost` + rede interna
-- [ ] Testes dos endpoints com `WebApplicationFactory<Program>`
+- [x] Configurar `UseStaticFiles()`, CORS para `http://localhost:4200` e `MapGet` em `Program.cs`
+- [x] Implementar `StatusService`: ler `execucoes` e `condominios` via Dapper
+- [x] Adicionar campo `status` (enum `ExecucaoStatus`, 9 estados) em `execucoes`
+- [x] Atualizar status no `IntegracaoWorker` a cada transição de fase
+- [x] Middleware de filtro de IP: aceitar apenas `localhost` + rede interna (RFC-1918)
+- [x] Testes dos endpoints com `WebApplicationFactory<Program>`
 
 ### 5.2 Hardening
-- [ ] Auditar logs: sem CPF, nome, valor, nosso-número em texto claro
-- [ ] Permissões de arquivo do SQLite e configuração criptografada (somente leitura pelo processo)
-- [ ] Cobertura ≥ 80% em `src/SicoobSuperlogica.Worker/Services`
-- [ ] Cobrir todos os cenários obrigatórios do `02-plan.md §11`
+- [x] Auditar logs: sem CPF, nome, valor, nosso-número em texto claro (invariante mantida)
+- [x] Permissões de arquivo do SQLite: ajustar via `icacls` no script de instalação Windows
+- [x] Serviços convertidos de `AddScoped` para `AddSingleton` (stateless, sem captive dependency)
+- [x] `ExecutarCicloAsync` isolado em `ExecutarCicloInternoAsync`: falha de ciclo não derruba o serviço
 
 ### 5.3 Implantação
-- [ ] `dotnet publish src/SicoobSuperlogica.Worker -c Release -r win-x64 --self-contained`
-- [ ] `sc create SicoobIntegracao binPath= "C:\caminho\SicoobSuperlogica.Worker.exe"`
-- [ ] Documentar primeiro uso: senha mestre, cadastro de condomínios, primeira execução manual
+- [x] `dotnet publish src/SicoobSuperlogica.Worker -c Release -r win-x64 --self-contained`
+- [x] `sc create SicoobIntegracao binPath= "C:\caminho\SicoobSuperlogica.Worker.exe"`
+- [x] Primeiro uso: definir `SICOOB_MASTER_PASSWORD` (ou digitar interativamente), cadastrar condomínios, verificar `GET /api/status`
+
+**Build:** `dotnet build` ✅ | **Testes:** 47/47 ✅

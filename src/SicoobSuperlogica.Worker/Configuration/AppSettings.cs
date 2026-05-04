@@ -6,6 +6,7 @@ public class AppSettings
     public SicoobSettings Sicoob { get; set; } = new();
     public SuperlogicaSettings Superlogica { get; set; } = new();
     public DatabaseSettings Database { get; set; } = new();
+    public ApiSettings Api { get; set; } = new();
 }
 
 public class WorkerSettings
@@ -30,9 +31,17 @@ public class SicoobSettings
 public class SuperlogicaSettings
 {
     public string BaseUrl { get; set; } = "https://api.superlogica.net/v2/condor";
+
+    // TODO: confirmar path exato com suporte Superlógica antes da Fase 3 em produção
+    public string UploadPath { get; set; } = "/financeiro/cobranca/retorno";
 }
 
 public class DatabaseSettings
 {
     public string Path { get; set; } = "sicoob.db";
+}
+
+public class ApiSettings
+{
+    public string[] CorsOrigins { get; set; } = ["http://localhost:4200"];
 }

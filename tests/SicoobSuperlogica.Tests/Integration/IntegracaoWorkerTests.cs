@@ -1,4 +1,5 @@
 using FluentAssertions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SicoobSuperlogica.Worker.Configuration;
@@ -8,35 +9,47 @@ using SicoobSuperlogica.Worker.Workers;
 
 namespace SicoobSuperlogica.Tests.Integration;
 
-/// <summary>
-/// Testa o <see cref="IntegracaoWorker"/> em nível de integração com mocks
-/// de todos os serviços externos, focando no comportamento de falha parcial.
-/// </summary>
 public class IntegracaoWorkerTests
 {
     private readonly Mock<ICondominioService> _condominiosMock = new();
     private readonly Mock<IRetornoSicoobService> _retornoMock = new();
     private readonly Mock<ICnabParserService> _parserMock = new();
+    private readonly Mock<ISuperlogicaService> _superlogicaMock = new();
     private readonly Mock<IIdempotencyService> _idempotencyMock = new();
     private readonly Mock<IStatusService> _statusMock = new();
+    private readonly Mock<IHostApplicationLifetime> _lifetimeMock = new();
 
     private readonly WorkerSettings _settings = new()
     {
         IntervalHours = 1,
-        CondominioDelaySeconds = 0,  // sem delay em testes
+        CondominioDelaySeconds = 0,
         PollingMaxAttempts = 1,
         PollingIntervalMinutes = 0,
         HttpTimeoutSeconds = 10,
-        RetryCount = 1
+        RetryCount = 1,
+        CertificateAlertDaysBeforeExpiry = 30
     };
+
+    public IntegracaoWorkerTests()
+    {
+        _superlogicaMock.Setup(s => s.UploadArquivoAsync(
+                It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CondominioCredenciais>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Default: no pending failures
+        _statusMock.Setup(s => s.ListarFalhasTemporariasAsync())
+            .ReturnsAsync([]);
+    }
 
     private IntegracaoWorker CriarWorker() => new(
         _condominiosMock.Object,
         _retornoMock.Object,
         _parserMock.Object,
+        _superlogicaMock.Object,
         _idempotencyMock.Object,
         _statusMock.Object,
         _settings,
+        _lifetimeMock.Object,
         NullLogger<IntegracaoWorker>.Instance);
 
     private static Condominio CriarCondominio(int id) => new()
@@ -52,18 +65,14 @@ public class IntegracaoWorkerTests
     [Fact]
     public async Task ExecutarCiclo_FalhaParcial_UmCondominioFalha_OutrosContinuam()
     {
-        // Arrange: 3 condomínios – o do meio lança exceção
         var condominios = new[] { CriarCondominio(1), CriarCondominio(2), CriarCondominio(3) };
-        _condominiosMock.Setup(c => c.ListarAtivosAsync())
-                        .ReturnsAsync(condominios);
+        _condominiosMock.Setup(c => c.ListarAtivosAsync()).ReturnsAsync(condominios);
 
-        // Status: cria execução e retorna IDs sequenciais
         var execucaoSeq = 0;
         _statusMock.Setup(s => s.CriarExecucaoAsync(
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ExecucaoStatus>()))
             .ReturnsAsync(() => ++execucaoSeq);
 
-        // Condomínio 1: arquivo baixado e parseado com sucesso
         var streamCond1 = CriarStream();
         _retornoMock.Setup(r => r.ObterArquivoRetornoAsync(
                 It.Is<Condominio>(c => c.Id == 1), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -73,15 +82,13 @@ public class IntegracaoWorkerTests
             .Returns("chave-cond1");
         _idempotencyMock.Setup(i => i.JaProcessadoAsync("chave-cond1"))
             .ReturnsAsync(false);
-        _parserMock.Setup(p => p.Parsear(It.IsAny<Stream>()))
-            .Returns([]);
+        _parserMock.Setup(p => p.Parsear(It.IsAny<Stream>())).Returns([]);
 
-        // Condomínio 2: lança exceção (falha)
+        // Condomínio 2: falha na extração Sicoob
         _retornoMock.Setup(r => r.ObterArquivoRetornoAsync(
                 It.Is<Condominio>(c => c.Id == 2), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new HttpRequestException("Sicoob indisponível"));
 
-        // Condomínio 3: arquivo baixado e parseado com sucesso
         var streamCond3 = CriarStream();
         _retornoMock.Setup(r => r.ObterArquivoRetornoAsync(
                 It.Is<Condominio>(c => c.Id == 3), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
@@ -98,28 +105,21 @@ public class IntegracaoWorkerTests
             .Callback<int, ExecucaoStatus, int?, string?>((id, st, _, __) => statusUpdates.Add((id, st)))
             .Returns(Task.CompletedTask);
 
-        // Act: executa um ciclo completo
         var worker = CriarWorker();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-        // Invoca via ExecuteAsync e cancela após o primeiro ciclo
         var workerTask = worker.StartAsync(cts.Token);
-        await Task.Delay(500, CancellationToken.None); // tempo para o ciclo completar
+        await Task.Delay(500, CancellationToken.None);
         await worker.StopAsync(CancellationToken.None);
         await workerTask;
 
-        // Assert: execuções foram criadas para os 3 condomínios
         _statusMock.Verify(s => s.CriarExecucaoAsync(
             It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), ExecucaoStatus.A_PROCESSAR),
             Times.Exactly(3));
 
-        // Condomínio 2 deve ter FALHA_TEMPORARIA
         statusUpdates.Should().Contain(u => u.Status == ExecucaoStatus.FALHA_TEMPORARIA);
-
-        // Condomínios 1 e 3 devem ter FINALIZADO
         statusUpdates.Count(u => u.Status == ExecucaoStatus.FINALIZADO).Should().BeGreaterThanOrEqualTo(2);
 
-        // Condomínio 2 não deve ter parado o processamento dos demais
         _retornoMock.Verify(r => r.ObterArquivoRetornoAsync(
             It.Is<Condominio>(c => c.Id == 3),
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
@@ -149,8 +149,10 @@ public class IntegracaoWorkerTests
         _statusMock.Verify(s => s.AtualizarAsync(
             1, ExecucaoStatus.SEM_TITULOS, 0, null), Times.Once);
 
-        // Idempotency não deve ser verificada para SEM_MOVIMENTO
         _idempotencyMock.Verify(i => i.JaProcessadoAsync(It.IsAny<string>()), Times.Never);
+        _superlogicaMock.Verify(s => s.UploadArquivoAsync(
+            It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CondominioCredenciais>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -170,7 +172,7 @@ public class IntegracaoWorkerTests
                 It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>()))
             .Returns("chave-existente");
         _idempotencyMock.Setup(i => i.JaProcessadoAsync("chave-existente"))
-            .ReturnsAsync(true);  // já processado
+            .ReturnsAsync(true);
 
         var worker = CriarWorker();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
@@ -179,10 +181,127 @@ public class IntegracaoWorkerTests
         await Task.Delay(300, CancellationToken.None);
         await worker.StopAsync(CancellationToken.None);
 
-        // Parser não deve ser chamado quando idempotência bloqueia
         _parserMock.Verify(p => p.Parsear(It.IsAny<Stream>()), Times.Never);
+        _superlogicaMock.Verify(s => s.UploadArquivoAsync(
+            It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CondominioCredenciais>(), It.IsAny<CancellationToken>()),
+            Times.Never);
 
-        // Status final deve ser FINALIZADO (ignorado silenciosamente)
         _statusMock.Verify(s => s.AtualizarAsync(1, ExecucaoStatus.FINALIZADO, null, null), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecutarCiclo_FalhaSuperlogica_RegistraFalhaTemporaria()
+    {
+        var cond = CriarCondominio(1);
+        _condominiosMock.Setup(c => c.ListarAtivosAsync()).ReturnsAsync([cond]);
+        _statusMock.Setup(s => s.CriarExecucaoAsync(
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ExecucaoStatus>()))
+            .ReturnsAsync(1);
+
+        _retornoMock.Setup(r => r.ObterArquivoRetornoAsync(
+                cond, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((false, (Stream?)CriarStream()));
+
+        _idempotencyMock.Setup(i => i.ComputarChave(
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>()))
+            .Returns("chave-nova");
+        _idempotencyMock.Setup(i => i.JaProcessadoAsync("chave-nova")).ReturnsAsync(false);
+        _parserMock.Setup(p => p.Parsear(It.IsAny<Stream>())).Returns([]);
+
+        _superlogicaMock.Setup(s => s.UploadArquivoAsync(
+                It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CondominioCredenciais>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("Upload falhou com status 503"));
+
+        var statusUpdates = new List<(int ExecucaoId, ExecucaoStatus Status)>();
+        _statusMock.Setup(s => s.AtualizarAsync(
+                It.IsAny<int>(), It.IsAny<ExecucaoStatus>(), It.IsAny<int?>(), It.IsAny<string?>()))
+            .Callback<int, ExecucaoStatus, int?, string?>((id, st, _, __) => statusUpdates.Add((id, st)))
+            .Returns(Task.CompletedTask);
+
+        var worker = CriarWorker();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+        await worker.StartAsync(cts.Token);
+        await Task.Delay(300, CancellationToken.None);
+        await worker.StopAsync(CancellationToken.None);
+
+        statusUpdates.Should().Contain(u => u.Status == ExecucaoStatus.FALHA_TEMPORARIA);
+        _idempotencyMock.Verify(i => i.RegistrarSucessoAsync(It.IsAny<string>(), It.IsAny<int>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ExecutarCiclo_UploadBemSucedido_TransicionaStatusCorretamente()
+    {
+        var cond = CriarCondominio(1);
+        _condominiosMock.Setup(c => c.ListarAtivosAsync()).ReturnsAsync([cond]);
+        _statusMock.Setup(s => s.CriarExecucaoAsync(
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ExecucaoStatus>()))
+            .ReturnsAsync(1);
+
+        _retornoMock.Setup(r => r.ObterArquivoRetornoAsync(
+                cond, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((false, (Stream?)CriarStream()));
+
+        _idempotencyMock.Setup(i => i.ComputarChave(
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<Stream>()))
+            .Returns("chave-nova");
+        _idempotencyMock.Setup(i => i.JaProcessadoAsync("chave-nova")).ReturnsAsync(false);
+        _parserMock.Setup(p => p.Parsear(It.IsAny<Stream>())).Returns([]);
+
+        var statusUpdates = new List<ExecucaoStatus>();
+        _statusMock.Setup(s => s.AtualizarAsync(
+                It.IsAny<int>(), It.IsAny<ExecucaoStatus>(), It.IsAny<int?>(), It.IsAny<string?>()))
+            .Callback<int, ExecucaoStatus, int?, string?>((_, st, _, __) => statusUpdates.Add(st))
+            .Returns(Task.CompletedTask);
+
+        var worker = CriarWorker();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+        await worker.StartAsync(cts.Token);
+        await Task.Delay(300, CancellationToken.None);
+        await worker.StopAsync(CancellationToken.None);
+
+        statusUpdates.Should().ContainInOrder(
+            ExecucaoStatus.ARQUIVO_BAIXADO,
+            ExecucaoStatus.PROCESSAMENTO_FINALIZADO,
+            ExecucaoStatus.ENVIANDO_TITULOS,
+            ExecucaoStatus.ENVIADO_SUPERLOGICA,
+            ExecucaoStatus.FINALIZADO);
+
+        _superlogicaMock.Verify(s => s.UploadArquivoAsync(
+            It.IsAny<Stream>(), It.IsAny<string>(), It.IsAny<CondominioCredenciais>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+
+        _idempotencyMock.Verify(i => i.RegistrarSucessoAsync("chave-nova", 1), Times.Once);
+    }
+
+    [Fact]
+    public async Task ExecutarCiclo_FalhaTemporariaPendente_EReprocessadaNoProximoCiclo()
+    {
+        var cond = CriarCondominio(5);
+        _condominiosMock.Setup(c => c.ListarAtivosAsync()).ReturnsAsync([cond]);
+
+        _statusMock.Setup(s => s.ListarFalhasTemporariasAsync())
+            .ReturnsAsync([new ExecucaoFalha(5, "2026-01-01", "2026-01-01")]);
+        _statusMock.Setup(s => s.MarcarReprocessandoAsync(5, "2026-01-01", "2026-01-01"))
+            .Returns(Task.CompletedTask);
+        _statusMock.Setup(s => s.CriarExecucaoAsync(
+                It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<ExecucaoStatus>()))
+            .ReturnsAsync(1);
+
+        _retornoMock.Setup(r => r.ObterArquivoRetornoAsync(
+                It.IsAny<Condominio>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((true, (Stream?)null));
+
+        var worker = CriarWorker();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+
+        await worker.StartAsync(cts.Token);
+        await Task.Delay(400, CancellationToken.None);
+        await worker.StopAsync(CancellationToken.None);
+
+        _statusMock.Verify(s => s.MarcarReprocessandoAsync(5, "2026-01-01", "2026-01-01"), Times.Once);
+        _retornoMock.Verify(r => r.ObterArquivoRetornoAsync(
+            cond, "2026-01-01", "2026-01-01", It.IsAny<CancellationToken>()), Times.Once);
     }
 }
